@@ -21,3 +21,9 @@ git diff --stat wacrm-upstream-80c3f9a..upstream/main
 ```
 
 Fetching for comparison does not authorize merging or rebasing upstream changes into this fork.
+
+## Customization and upgrade registry
+
+Git remains authoritative for exact code changes. The maintained intent and update-safety registry is described in [`docs/customization-registry.md`](./customization-registry.md) and stored locally at `D:\AI-Skills-Vault\Projects\WACRM_Customizations`.
+
+Upstream integration must use a dedicated reviewed upgrade branch. Cross-reference upstream-changed paths against the registry, reconcile every affected customization, run the complete verification matrix, and produce an Upgrade Report before moving this baseline marker.

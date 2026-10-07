@@ -163,6 +163,8 @@ Key pages:
   trace id to quote to Meta support
 - [Several WABAs on one deployment](./docs/multi-waba.md) — one Meta
   App or several; how `META_APP_SECRET` takes a comma-separated list
+- [Fork customization and upstream-upgrade registry](./docs/customization-registry.md)
+  — baseline, registry location, upgrade policy, and documentation rule
 
 ## Stack
 

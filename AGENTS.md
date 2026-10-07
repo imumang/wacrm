@@ -557,6 +557,18 @@ Final reports should distinguish:
 
 Do not claim completion for unverified behaviour, unresolved required security boundaries, or uncertain external/write outcomes.
 
+## 20. Customization Registry and Upstream Updates
+
+The durable customization and update-safety registry is maintained at:
+
+`D:\AI-Skills-Vault\Projects\WACRM_Customizations`
+
+Git is authoritative for exact changes; the registry records intent, dependencies, risks, preservation requirements, and upgrade procedures. See `docs/customization-registry.md` and `docs/upstream-baseline.md` for repository-side discovery metadata.
+
+Any task that changes an upstream-owned file, integration seam, database migration, or documented architecture decision must update the affected registry note before the task is complete. After a commit exists, record its SHA, update verification references and upgrade risk where needed, and refresh the Customization Index. Trivial generated files and formatting-only changes are exempt.
+
+Upstream updates must occur on dedicated reviewed upgrade branches. Never blindly replace customized files with upstream versions, and do not move the baseline marker until all overlaps are reviewed, the full verification matrix passes, an Upgrade Report exists, and the result is accepted.
+
 ## WhatsApp Business Tools MCP
 
 The project may use Meta's official WhatsApp Business Tools MCP:
