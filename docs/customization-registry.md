@@ -15,4 +15,3 @@ Upstream updates happen on dedicated reviewed upgrade branches. Review the old b
 ## Documentation completion rule
 
 Any task that changes an upstream-owned file, integration seam, database migration, or documented architecture decision must update the corresponding customization registry record before the task is complete. Record the relevant commit SHA after it exists, update tests and risk where necessary, and refresh the registry index. Trivial generated files and formatting-only changes are exempt.
-
