@@ -1,4 +1,4 @@
-import { AiError } from './types'
+import { AiError, type AiUsage } from './types'
 import { aiRequestTimeoutMs } from './defaults'
 import { providerHttpError, toNetworkError } from './providers/shared'
 
@@ -24,6 +24,32 @@ const BATCH_SIZE = 96
 
 interface EmbeddingResponse {
   data?: { embedding?: number[]; index?: number }[]
+  usage?: { prompt_tokens?: unknown; total_tokens?: unknown }
+}
+
+export interface EmbedTextsOptions {
+  /**
+   * Caller-side cancellation, composed with the request timeout.
+   *
+   * A bounded embedding operation (objective 03's backfill) must be
+   * able to stop when an operator closes the request, without waiting
+   * out the full timeout on a batch that is already unwanted.
+   */
+  signal?: AbortSignal
+}
+
+/**
+ * One embedding result plus whatever cost metadata the provider gave
+ * back.
+ *
+ * The usage block is returned rather than discarded because objective
+ * 03 records embedding spend in the existing `ai_usage_log` trail.
+ * `usage` is null when the provider reported nothing usable, which
+ * `logAiUsage` already knows how to skip.
+ */
+export interface EmbedTextsResult {
+  vectors: number[][]
+  usage: AiUsage | null
 }
 
 /** Format a vector for a pgvector column / RPC param: `[0.1,0.2,...]`.
@@ -31,6 +57,22 @@ interface EmbeddingResponse {
  *  not cast reliably. */
 export function toVectorLiteral(embedding: number[]): string {
   return `[${embedding.join(',')}]`
+}
+
+/**
+ * Compose the per-request timeout with an optional caller signal.
+ *
+ * Prefers `AbortSignal.any` and falls back to the timeout alone on a
+ * runtime that lacks it, which keeps this a timeout rather than an
+ * unhandled rejection on older Node builds.
+ */
+function requestSignal(timeoutMs: number, signal?: AbortSignal): AbortSignal {
+  const timeout = AbortSignal.timeout(timeoutMs)
+  if (!signal) return timeout
+  if (typeof AbortSignal.any === 'function') {
+    return AbortSignal.any([timeout, signal])
+  }
+  return timeout
 }
 
 /**
@@ -42,9 +84,27 @@ export async function embedTexts(
   apiKey: string,
   inputs: string[],
 ): Promise<number[][]> {
-  if (inputs.length === 0) return []
+  return (await embedTextsWithUsage(apiKey, inputs)).vectors
+}
+
+/**
+ * `embedTexts` plus the provider's usage block.
+ *
+ * The same single provider path the knowledge base already uses. This
+ * objective adds accounting and cancellation to it, not a second
+ * embedding client: there is exactly one embeddings endpoint, one key
+ * (`ai_configs.embeddings_api_key`) and one request shape in WACRM.
+ */
+export async function embedTextsWithUsage(
+  apiKey: string,
+  inputs: string[],
+  options: EmbedTextsOptions = {},
+): Promise<EmbedTextsResult> {
+  if (inputs.length === 0) return { vectors: [], usage: null }
   const timeoutMs = aiRequestTimeoutMs()
   const out: number[][] = []
+  let promptTokens = 0
+  let totalTokens = 0
 
   for (let start = 0; start < inputs.length; start += BATCH_SIZE) {
     const batch = inputs.slice(start, start + BATCH_SIZE)
@@ -58,7 +118,7 @@ export async function embedTexts(
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ model: EMBEDDING_MODEL, input: batch }),
-        signal: AbortSignal.timeout(timeoutMs),
+        signal: requestSignal(timeoutMs, options.signal),
       })
     } catch (err) {
       throw toNetworkError(err)
@@ -94,7 +154,32 @@ export async function embedTexts(
       }
       out.push(r.embedding)
     }
+
+    // Embeddings spend real money on the account's own key, so the
+    // usage block is accumulated across batches rather than kept from
+    // the last response only. Tolerant of partial/absent counts for the
+    // same reason `normalizeUsage` is.
+    promptTokens += nonNegativeInt(data?.usage?.prompt_tokens)
+    totalTokens += nonNegativeInt(data?.usage?.total_tokens)
   }
 
-  return out
+  const usage: AiUsage | null =
+    promptTokens === 0 && totalTokens === 0
+      ? null
+      : {
+          promptTokens,
+          // An embeddings response has no completion half. Reporting 0
+          // rather than prompt+completion keeps `total` equal to what
+          // the provider actually billed.
+          completionTokens: 0,
+          totalTokens,
+        }
+
+  return { vectors: out, usage }
+}
+
+function nonNegativeInt(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0
+    ? Math.floor(value)
+    : 0
 }
