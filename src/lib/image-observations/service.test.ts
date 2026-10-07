@@ -139,7 +139,6 @@ function candidatesFor(messageNames: string[]): ImageAnalysisMediaCandidate[] {
 }
 
 function observationDb(messageNames: string[] = ['a.jpg']) {
-  const accountId = ACCOUNT;
   return makeFakeObservationDb({
     conversations: [
       { id: CONVERSATION, account_id: ACCOUNT },

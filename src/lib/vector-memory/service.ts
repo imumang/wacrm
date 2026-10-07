@@ -59,7 +59,6 @@ import {
 import {
   buildPerImageObservationSemanticInput,
   perImageSemanticSources,
-  type PerImageSemanticInput,
 } from './per-image-semantic-input';
 
 /** What a bounded operation was asked to do. */

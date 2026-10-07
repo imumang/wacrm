@@ -236,7 +236,7 @@ async function record(output = toolOutput()) {
 
 describe('recordImageAnalysis', () => {
   it('records one image and its observation', async () => {
-    const { fake, result } = await record();
+    const { result } = await record();
 
     expect(result.created).toBe(true);
     expect(result.run.status).toBe('succeeded');
