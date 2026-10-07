@@ -69,3 +69,51 @@ jobs:
       # just the absence of an error.
       - name: Verify the resulting schema
         run: supabase db query --local --file supabase/ci/verify-schema.sql
+
+      # The schema check asserts shape. This one asserts BEHAVIOUR:
+      # it builds a real case and a real completed job and proves the
+      # outcome-capture guards actually fire - a labour duration that
+      # contradicts its own timestamps is rejected, an AI suggestion
+      # cannot be written as a collected amount, a finalized case is
+      # frozen, and a case cannot be attached to another account.
+      # Without this, every one of those could be dropped from a trigger
+      # and CI would stay green.
+      - name: Verify the outcome capture guards
+        run: supabase db query --local --file supabase/ci/verify-outcome-capture.sql
+
+      # The import check asserts BEHAVIOUR of migration 051: a dry run
+      # cannot record a created case, one source record cannot be
+      # attributed to two cases, the source ledger is append-only, a
+      # finalized case accepts no new imported source, and an
+      # imported_historical collected amount still does not earn
+      # tier A.
+      - name: Verify the historical import guards
+        run: supabase db query --local --file supabase/ci/verify-historical-import.sql
+
+      # Migration 052: quote money shape, explicit transitions, immutable
+      # revisions/events, idempotency, concurrency backstops and tenant RLS.
+      - name: Verify the quote lifecycle guards
+        run: supabase db query --local --file supabase/ci/verify-quotes.sql
+
+      # Migration 053: vector memory. Asserts BEHAVIOUR - an unregistered
+      # embedding model is rejected, content-hash dedup makes generation
+      # idempotent, a case can hold only one current vector per kind,
+      # identity and vector values are immutable, excluding a case
+      # withholds its vectors and a privileged write cannot reactivate
+      # them, deleting a case cascades them away, and RLS holds.
+      - name: Verify the vector memory guards
+        run: supabase db query --local --file supabase/ci/verify-vector-memory.sql
+
+      # Migration 054: canonical per-image observation persistence.
+      # Asserts BEHAVIOUR - the same media under the same model and
+      # schema is idempotent while a re-analysis under a different
+      # model, schema or prompt is representable, an observation
+      # spanning several photographs is stored once with several
+      # source links, a caller-supplied media path that is not derived
+      # from the source message is refused, an unvalidated run cannot
+      # carry an observation, observations are immutable, a priced or
+      # weighed payload is refused, excluding a case withholds its
+      # analyses, deleting a photograph prunes the observation that
+      # lost its last source, and RLS holds.
+      - name: Verify the image observation guards
+        run: supabase db query --local --file supabase/ci/verify-image-observations.sql
