@@ -1,7 +1,8 @@
 # WhatsApp Production Setup and Message Recovery Runbook
 
-**Status:** Verified working on 7 October 2026  
-**Scope:** Clear Waste Removal development deployment at `chat.clearwasteremoval.uk`  
+**Status:** Verified working on 7 October 2026
+
+**Scope:** Clear Waste Removal development deployment at `chat.clearwasteremoval.uk`
 **Transport:** Official Meta WhatsApp Cloud API only
 
 > Security rule: never add access tokens, app secrets, verification tokens, PINs,
