@@ -42,3 +42,13 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local development and repository-intelligence tooling
+/.playwright-mcp/
+/graphify-out/
+/supabase/.temp/
+/supabase/.branches/
+/.codex/
+/.opencode/
+/.serena/
+/opencode.jsonc
