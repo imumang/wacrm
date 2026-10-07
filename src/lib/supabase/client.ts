@@ -1,5 +1,6 @@
 import { createBrowserClient } from '@supabase/ssr'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { getBrowserSupabaseUrl, getSupabaseAuthCookieName } from './config'
 
 // Singleton instance — one client shared across the whole browser session.
 // Creating multiple clients causes auth-lock contention ("Lock was released
@@ -10,8 +11,11 @@ export function createClient() {
   if (browserClient) return browserClient
 
   browserClient = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    getBrowserSupabaseUrl(),
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    // Preserve the pre-proxy cookie name so existing localhost sessions keep
+    // working and the browser and SSR clients can share one session.
+    { cookieOptions: { name: getSupabaseAuthCookieName() } }
   )
 
   return browserClient

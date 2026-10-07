@@ -22,3 +22,11 @@ shadow_port = 54320
 # one failure mode this whole check exists to prevent. 17 is the CLI's
 # current default, not a reading of the live project.
 major_version = 17
+
+[auth]
+site_url = "https://chat.clearwasteremoval.uk"
+additional_redirect_urls = [
+  "http://localhost:3000/**",
+  "http://127.0.0.1:3000/**",
+  "https://chat.clearwasteremoval.uk/**",
+]

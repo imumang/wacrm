@@ -85,6 +85,7 @@ const nextConfig: NextConfig = {
    * has no effect on a production build.
    */
   allowedDevOrigins: [
+    "chat.clearwasteremoval.uk",
     "*.ngrok-free.app",
     "*.ngrok.app",
     "*.ngrok.io",
@@ -96,6 +97,19 @@ const nextConfig: NextConfig = {
           .filter(Boolean)
       : []),
   ],
+
+  async rewrites() {
+    const supabaseUrl = (
+      process.env.SUPABASE_INTERNAL_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL
+    )?.replace(/\/$/, "");
+
+    if (!supabaseUrl) return [];
+
+    return ["auth", "rest", "storage", "realtime"].map((service) => ({
+      source: `/supabase/${service}/:path*`,
+      destination: `${supabaseUrl}/${service}/:path*`,
+    }));
+  },
 
   /**
    * Cache-Control policy.
@@ -141,7 +155,18 @@ const nextConfig: NextConfig = {
         headers: [{ key: "Cache-Control", value: "no-store" }],
       },
       {
-        source: "/:path((?!_next/static|_next/image|api).*)",
+        // The same-origin Supabase proxy carries authenticated, tenant-scoped
+        // data and must never be stored by Cloudflare or another shared cache.
+        source: "/supabase/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "private, no-store, max-age=0, must-revalidate",
+          },
+        ],
+      },
+      {
+        source: "/:path((?!_next/static|_next/image|api|supabase).*)",
         headers: [
           {
             key: "Cache-Control",
