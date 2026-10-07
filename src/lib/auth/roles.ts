@@ -107,3 +107,30 @@ export function canDeleteAccount(role: AccountRole): boolean {
 export function canTransferOwnership(role: AccountRole): boolean {
   return role === "owner";
 }
+
+/**
+ * Admin+: run a historical data import.
+ *
+ * Deliberately not `agent`. A bulk import decides what a future
+ * training set will contain for the whole account, and the narrower
+ * the role that can do that, the less a single compromised agent
+ * account can do to the dataset. This matches the RLS write policy on
+ * `historical_import_runs` and `historical_case_sources` (migration
+ * 051), so the guard and the database agree.
+ */
+export function canImportHistoricalData(role: AccountRole): boolean {
+  return hasMinRole(role, "admin");
+}
+
+/** Admin+: generate or regenerate the account's vector memory.
+ *
+ * Admin, matching the RLS write policy the writes run under (migration
+ * 053) and `canImportHistoricalData`. Generation spends the account's
+ * own embeddings key on a paid API over its whole learning dataset, so
+ * it belongs to the same narrow role as a bulk import: the fewer
+ * roles that can rewrite the dataset at scale, the less a single
+ * compromised agent account can do.
+ */
+export function canGenerateVectorMemory(role: AccountRole): boolean {
+  return hasMinRole(role, "admin");
+}
