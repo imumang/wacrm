@@ -8,7 +8,12 @@ import {
   type ProviderArgs,
 } from './shared'
 
-const OPENAI_URL = 'https://api.openai.com/v1/chat/completions'
+/**
+ * The single Chat Completions endpoint WACRM talks to. Exported so the
+ * image-analysis vision adapter reuses this one definition instead of
+ * restating the URL (a second copy is a second thing to keep correct).
+ */
+export const OPENAI_CHAT_COMPLETIONS_URL = 'https://api.openai.com/v1/chat/completions'
 
 interface OpenAiResponse {
   choices?: { message?: { content?: string } }[]
@@ -29,7 +34,7 @@ export async function generateOpenAi(args: ProviderArgs): Promise<ProviderResult
 
   let res: Response
   try {
-    res = await fetch(OPENAI_URL, {
+    res = await fetch(OPENAI_CHAT_COMPLETIONS_URL, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiKey}`,

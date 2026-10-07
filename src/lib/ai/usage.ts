@@ -1,12 +1,28 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { AiProvider, AiUsage } from './types'
 
+/**
+ * Which surface spent the tokens. Mirrors the `mode` CHECK constraint on
+ * `ai_usage_log`; widening this union without the matching migration would
+ * make every usage write fail, and `logAiUsage` swallows that by design.
+ *
+ * `embeddings` was added by migration 053: vector-memory generation
+ * spends the account's embeddings key on the same BYO-key trail as the
+ * reply assistant and image analysis, rather than in a parallel
+ * accounting system.
+ */
+export type AiUsageMode =
+  | 'auto_reply'
+  | 'draft'
+  | 'image_analysis'
+  | 'embeddings'
+
 export interface LogAiUsageArgs {
   accountId: string
   /** Null for a draft not tied to one thread, or when the row was
    *  deleted between generation and logging. */
   conversationId: string | null
-  mode: 'auto_reply' | 'draft'
+  mode: AiUsageMode
   provider: AiProvider
   model: string
   /** Provider usage; a no-op when null (nothing worth recording). */

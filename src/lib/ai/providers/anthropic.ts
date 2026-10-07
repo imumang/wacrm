@@ -8,8 +8,9 @@ import {
   type ProviderArgs,
 } from './shared'
 
-const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages'
-const ANTHROPIC_VERSION = '2023-06-01'
+/** Exported so the image-analysis vision adapter reuses these definitions. */
+export const ANTHROPIC_MESSAGES_URL = 'https://api.anthropic.com/v1/messages'
+export const ANTHROPIC_API_VERSION = '2023-06-01'
 
 interface AnthropicResponse {
   content?: { type?: string; text?: string }[]
@@ -44,11 +45,11 @@ export async function generateAnthropic(args: ProviderArgs): Promise<ProviderRes
 
   let res: Response
   try {
-    res = await fetch(ANTHROPIC_URL, {
+    res = await fetch(ANTHROPIC_MESSAGES_URL, {
       method: 'POST',
       headers: {
         'x-api-key': apiKey,
-        'anthropic-version': ANTHROPIC_VERSION,
+        'anthropic-version': ANTHROPIC_API_VERSION,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
