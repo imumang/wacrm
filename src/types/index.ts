@@ -10,6 +10,16 @@ export type {
   InteractiveListSection,
 } from "@/lib/whatsapp/interactive";
 
+export type {
+  Enquiry,
+  EnquiryContext,
+  EnquiryFacts,
+  EnquiryFactsPatch,
+  EnquiryMissingInformation,
+  EnquiryStateEvent,
+  EnquiryWorkflowState,
+} from "@/lib/enquiries/model";
+
 export interface Profile {
   id: string;
   user_id: string;
