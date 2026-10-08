@@ -1114,6 +1114,140 @@ BEGIN
       'image observation tables must not store raw provider output';
   END IF;
 
+  -- 055 replaces public Storage API SELECT policies with authenticated,
+  -- account-scoped policies while intentionally preserving public bucket
+  -- visibility for the existing public-URL media contract.
+  IF EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'storage' AND tablename = 'objects'
+      AND cmd IN ('SELECT', 'ALL')
+      AND (roles && ARRAY['public', 'anon']::name[])
+      AND (qual LIKE '%avatars%' OR qual LIKE '%flow-media%' OR qual LIKE '%chat-media%')
+  ) THEN
+    RAISE EXCEPTION
+      'a storage SELECT policy on avatars/flow-media/chat-media still applies to anon - migration 055 did not apply';
+  END IF;
+
+  IF (
+    SELECT COUNT(*) FROM pg_policies
+    WHERE schemaname = 'storage' AND tablename = 'objects' AND cmd = 'SELECT'
+      AND roles = ARRAY['authenticated']::name[]
+      AND policyname IN (
+        'Users can read their own avatar',
+        'Members can read flow media',
+        'Members can read chat media'
+      )
+  ) <> 3 THEN
+    RAISE EXCEPTION
+      'the scoped storage SELECT policies are missing - migration 055 did not apply';
+  END IF;
+
+  IF (
+    SELECT COUNT(*) FROM storage.buckets
+    WHERE id IN ('avatars', 'flow-media', 'chat-media') AND public
+  ) <> 3 THEN
+    RAISE EXCEPTION
+      'migration 055 must not change existing public bucket visibility';
+  END IF;
+
+  -- 056 confines six internal SECURITY DEFINER entry points to the
+  -- service role. PUBLIC grants would also make the anon/authenticated
+  -- privilege checks below true.
+  IF EXISTS (
+    SELECT 1
+    FROM unnest(ARRAY[
+      'public._bcast_bump(uuid,text,integer)',
+      'public.recompute_broadcast_counts(uuid)',
+      'public.claim_ai_reply_slot(uuid,integer)',
+      'public.record_webhook_failure(uuid,integer)',
+      'public.merge_duplicate_contacts()',
+      'public.merge_duplicate_conversations()'
+    ]::regprocedure[]) AS f(fn)
+    WHERE has_function_privilege('anon', f.fn, 'EXECUTE')
+       OR has_function_privilege('authenticated', f.fn, 'EXECUTE')
+       OR NOT has_function_privilege('service_role', f.fn, 'EXECUTE')
+  ) THEN
+    RAISE EXCEPTION
+      'an internal SECURITY DEFINER function has an unsafe grant - migration 056 did not apply';
+  END IF;
+
+  -- 057 widens the pending-execution vocabulary and adds the small
+  -- partial index used by inbound wait-for-reply lookups.
+  IF COALESCE(
+       pg_get_constraintdef(
+         (SELECT oid FROM pg_constraint
+          WHERE conname = 'automation_pending_executions_status_check'
+            AND conrelid = 'public.automation_pending_executions'::regclass)
+       ),
+       ''
+     ) NOT LIKE '%awaiting_reply%' THEN
+    RAISE EXCEPTION
+      'automation_pending_executions status does not allow awaiting_reply - migration 057 did not apply';
+  END IF;
+
+  IF to_regclass('public.idx_automation_pending_awaiting_reply') IS NULL THEN
+    RAISE EXCEPTION
+      'idx_automation_pending_awaiting_reply is missing - migration 057 did not apply';
+  END IF;
+
+  -- 058 adds the disabled OpenAI-compatible provider vocabulary without
+  -- removing the fork's image-analysis or embeddings usage modes.
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'ai_configs'
+      AND column_name = 'base_url'
+  ) THEN
+    RAISE EXCEPTION 'ai_configs.base_url is missing - migration 058 did not apply';
+  END IF;
+
+  IF COALESCE(
+       pg_get_constraintdef(
+         (SELECT oid FROM pg_constraint
+          WHERE conname = 'ai_configs_provider_check'
+            AND conrelid = 'public.ai_configs'::regclass)
+       ),
+       ''
+     ) NOT LIKE '%openai_compatible%'
+     OR COALESCE(
+       pg_get_constraintdef(
+         (SELECT oid FROM pg_constraint
+          WHERE conname = 'ai_configs_openai_compatible_base_url_check'
+            AND conrelid = 'public.ai_configs'::regclass)
+       ),
+       ''
+     ) NOT LIKE '%base_url%'
+     OR COALESCE(
+       pg_get_constraintdef(
+         (SELECT oid FROM pg_constraint
+          WHERE conname = 'ai_usage_log_provider_check'
+            AND conrelid = 'public.ai_usage_log'::regclass)
+       ),
+       ''
+     ) NOT LIKE '%openai_compatible%' THEN
+    RAISE EXCEPTION
+      'OpenAI-compatible provider constraints are incomplete - migration 058 did not apply';
+  END IF;
+
+  IF COALESCE(
+       pg_get_constraintdef(
+         (SELECT oid FROM pg_constraint
+          WHERE conname = 'ai_usage_log_mode_check'
+            AND conrelid = 'public.ai_usage_log'::regclass)
+       ),
+       ''
+     ) NOT LIKE '%image_analysis%'
+     OR COALESCE(
+       pg_get_constraintdef(
+         (SELECT oid FROM pg_constraint
+          WHERE conname = 'ai_usage_log_mode_check'
+            AND conrelid = 'public.ai_usage_log'::regclass)
+       ),
+       ''
+     ) NOT LIKE '%embeddings%' THEN
+    RAISE EXCEPTION
+      'migration 058 must preserve image_analysis and embeddings usage modes';
+  END IF;
+
   RAISE NOTICE 'schema verification passed';
 END
 $$;

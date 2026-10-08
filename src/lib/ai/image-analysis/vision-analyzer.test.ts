@@ -88,6 +88,7 @@ function aiConfig(overrides: Partial<AiConfig> = {}): AiConfig {
   return {
     provider: 'openai',
     model: 'gpt-5.4-mini',
+    baseUrl: null,
     apiKey: API_KEY,
     systemPrompt: null,
     isActive: true,

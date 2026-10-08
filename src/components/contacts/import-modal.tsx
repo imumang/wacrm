@@ -216,9 +216,9 @@ export function ImportModal({
         data: { session },
       } = await supabase.auth.getSession();
       const user = session?.user;
-      if (!user) throw new Error('Not authenticated');
+      if (!user) throw new Error(t('notAuthenticated'));
       if (!accountId)
-        throw new Error('Your profile is not linked to an account.');
+        throw new Error(t('notLinkedToAccount'));
 
       let imported = 0;
       let skipped = 0;
@@ -386,7 +386,7 @@ export function ImportModal({
       if (skippedNames.length > 0) {
         const sample = skippedNames.slice(0, 3).join(', ');
         const more =
-          skippedNames.length > 3 ? ` (+${skippedNames.length - 3} more)` : '';
+          skippedNames.length > 3 ? t('toastTagsSkippedMore', { count: skippedNames.length - 3 }) : '';
         toast.info(t('toastTagsSkipped', { sample, more }));
       }
       if (skipped > 0) {
@@ -624,9 +624,14 @@ export function ImportModal({
                   </div>
                 )}
                 {result.invalidPhone > 0 && (
-                  <div className="flex items-center gap-1.5 text-sm text-amber-400">
-                    <AlertTriangle className="size-4 shrink-0" />
-                    {t('resultInvalidPhone', { count: result.invalidPhone })}
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-1.5 text-sm text-amber-400">
+                      <AlertTriangle className="size-4 shrink-0" />
+                      {t('resultInvalidPhone', { count: result.invalidPhone })}
+                    </div>
+                    <p className="pl-[1.375rem] text-xs text-muted-foreground">
+                      {t('invalidPhoneHint')}
+                    </p>
                   </div>
                 )}
                 {result.failed > 0 && (
