@@ -17,6 +17,13 @@ const h = vi.hoisted(() => ({
     logUpdates: [] as Record<string, unknown>[],
     // automation_pending_executions rows, mutated in place by updates.
     pending: [] as Record<string, unknown>[],
+    // Every update issued against automation_pending_executions, with the
+    // filters it carried and how many rows it matched (0 = lost the CAS).
+    pendingUpdates: [] as {
+      payload: Record<string, unknown>;
+      filters: [string, string, unknown][];
+      matched: number;
+    }[],
   },
 }));
 
@@ -59,10 +66,19 @@ vi.mock("./admin-client", () => {
         return { data: row, error: null };
       }
       const hit = state.pending.filter((r) => matches(r, ops.filters));
+      // Snapshot before mutating: the real UPDATE ... RETURNING returns
+      // only rows that matched the WHERE at the instant it ran, and this
+      // whole block runs synchronously, so it is an atomic compare-and-set.
+      const result = one([...hit]);
       if (type === "update") {
+        state.pendingUpdates.push({
+          payload: ops.payload as Record<string, unknown>,
+          filters: ops.filters,
+          matched: hit.length,
+        });
         hit.forEach((r) => Object.assign(r, ops.payload as Record<string, unknown>));
       }
-      return { data: one(hit), error: null };
+      return { data: result, error: null };
     }
     if (table === "contacts") {
       if (type === "update") {
@@ -182,6 +198,7 @@ beforeEach(() => {
   h.state.logInserts = [];
   h.state.logUpdates = [];
   h.state.pending = [];
+  h.state.pendingUpdates = [];
   vi.clearAllMocks();
 });
 
@@ -894,5 +911,151 @@ describe("wait_for_reply", () => {
     expect(expired).toBe(1);
     expect(h.state.pending[0].status).toBe("expired");
     expect(h.state.logUpdates.at(-1)).toEqual({ error_message: "no reply within 24h" });
+  });
+});
+
+describe("resumeAwaitingReply — concurrent claim", () => {
+  const OTHER_ACCOUNT = "acct-2";
+  const input = (accountId = ACCOUNT, text = "Website") => ({
+    accountId,
+    contactId: "c1",
+    context: { message_text: text, conversation_id: "conv1" },
+  });
+  const claims = () =>
+    h.state.pendingUpdates.filter((u) => u.payload.status === "running");
+
+  async function parked() {
+    h.state.owned = { id: "c1" };
+    h.state.ownedConversation = { id: "conv1" };
+    h.state.automations = [
+      {
+        id: "a1",
+        account_id: ACCOUNT,
+        user_id: "u1",
+        trigger_type: "new_message_received",
+        trigger_config: {},
+        is_active: true,
+      },
+    ];
+    h.state.steps = [
+      {
+        id: "btn",
+        automation_id: "a1",
+        step_type: "send_buttons",
+        position: 0,
+        parent_step_id: null,
+        branch: null,
+        step_config: {
+          kind: "buttons",
+          body: "Which?",
+          buttons: [{ id: "web", title: "Website" }],
+          wait_for_reply: true,
+        },
+      },
+      {
+        id: "say",
+        automation_id: "a1",
+        step_type: "send_message",
+        position: 1,
+        parent_step_id: null,
+        branch: null,
+        step_config: { text: "resumed" },
+      },
+    ];
+    await runAutomationsForTrigger({
+      accountId: ACCOUNT,
+      triggerType: "new_message_received",
+      contactId: "c1",
+      context: { message_text: "Hii", conversation_id: "conv1" },
+    });
+    expect(h.state.pending).toHaveLength(1);
+    vi.mocked(engineSendText).mockClear();
+    h.state.pendingUpdates = [];
+  }
+
+  it("lets exactly one of two simultaneous deliveries resume and send", async () => {
+    await parked();
+
+    const results = await Promise.all([
+      resumeAwaitingReply(input()),
+      resumeAwaitingReply(input()),
+    ]);
+
+    // Both callers really raced to the claim (each issued its own UPDATE),
+    // but only one UPDATE matched a row.
+    expect(claims()).toHaveLength(2);
+    expect(claims().map((c) => c.matched).sort()).toEqual([0, 1]);
+    expect(results.filter(Boolean)).toHaveLength(1);
+    expect(engineSendText).toHaveBeenCalledTimes(1);
+    expect(h.state.pending[0].status).toBe("done");
+  });
+
+  it("holds with many simultaneous deliveries", async () => {
+    await parked();
+
+    const results = await Promise.all(
+      Array.from({ length: 10 }, () => resumeAwaitingReply(input())),
+    );
+
+    expect(results.filter(Boolean)).toHaveLength(1);
+    expect(claims().filter((c) => c.matched === 1)).toHaveLength(1);
+    expect(engineSendText).toHaveBeenCalledTimes(1);
+  });
+
+  it("scopes both the lookup and the claim by account_id", async () => {
+    await parked();
+
+    await resumeAwaitingReply(input());
+
+    const [claim] = claims();
+    expect(claim.filters).toContainEqual(["eq", "account_id", ACCOUNT]);
+    expect(claim.filters).toContainEqual(["eq", "status", "awaiting_reply"]);
+  });
+
+  it("a delivery for another account cannot claim or resume the run", async () => {
+    await parked();
+
+    expect(await resumeAwaitingReply(input(OTHER_ACCOUNT))).toBe(false);
+
+    expect(claims()).toHaveLength(0);
+    expect(engineSendText).not.toHaveBeenCalled();
+    expect(h.state.pending[0].status).toBe("awaiting_reply");
+  });
+
+  it("claim is account-scoped even if the lookup surfaced a foreign row", async () => {
+    await parked();
+    // Simulate a row id leaking across tenants: the claim must still miss.
+    h.state.pending[0].account_id = OTHER_ACCOUNT;
+    const row = h.state.pending[0];
+    // Lookup is also account-scoped, so nothing is found at all.
+    expect(await resumeAwaitingReply(input())).toBe(false);
+    expect(row.status).toBe("awaiting_reply");
+    expect(engineSendText).not.toHaveBeenCalled();
+  });
+
+  it("does not retry after a claimed resume throws: marks failed, consumes the message, never re-sends", async () => {
+    await parked();
+    vi.mocked(engineSendText).mockRejectedValueOnce(new Error("graph api down"));
+
+    const first = await resumeAwaitingReply(input());
+    const second = await resumeAwaitingReply(input());
+
+    const status = h.state.pending[0].status;
+    // At-most-once: the row left awaiting_reply for good, so a redelivery
+    // finds nothing to claim and cannot double-send.
+    expect(status).not.toBe("awaiting_reply");
+    expect(status).not.toBe("running");
+    expect(second).toBe(false);
+    expect(engineSendText).toHaveBeenCalledTimes(1);
+    expect(first).toBe(true);
+  });
+
+  it("duplicate sequential webhook delivery is a no-op after the first resume", async () => {
+    await parked();
+
+    expect(await resumeAwaitingReply(input())).toBe(true);
+    expect(await resumeAwaitingReply(input())).toBe(false);
+
+    expect(engineSendText).toHaveBeenCalledTimes(1);
   });
 });

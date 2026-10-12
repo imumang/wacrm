@@ -251,6 +251,7 @@ export async function resumeAwaitingReply(input: AwaitingReplyInput): Promise<bo
       .from('automation_pending_executions')
       .update({ status: 'running' })
       .eq('id', pending.id)
+      .eq('account_id', input.accountId)
       .eq('status', 'awaiting_reply')
       .select('id')
       .maybeSingle()
