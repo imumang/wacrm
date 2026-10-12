@@ -10,6 +10,7 @@ import { validateAiCredentials } from '@/lib/ai/validate'
 import { embedTexts } from '@/lib/ai/embeddings'
 import { AiError, type AiProvider } from '@/lib/ai/types'
 import { normalizeOpenAiCompatibleBaseUrl } from '@/lib/ai/providers/openai-compatible'
+import { isProviderAllowed, isCompatibleProviderEnabled, COMPATIBLE_PROVIDER_DISABLED_CODE } from '@/lib/ai/compatible-provider-gate'
 import { getT } from '@/lib/i18n/translate'
 
 const t = getT('Api')
@@ -47,7 +48,13 @@ export async function GET() {
       )
     }
 
-    if (!data) return NextResponse.json({ configured: false })
+    const compatibleProviderEnabled = isCompatibleProviderEnabled()
+    if (!data) {
+      return NextResponse.json({
+        configured: false,
+        compatible_provider_enabled: compatibleProviderEnabled,
+      })
+    }
     // The keys are selected only to derive the has_* flags; neither is
     // returned to the client.
     const { api_key, embeddings_api_key, ...safe } = data
@@ -55,6 +62,7 @@ export async function GET() {
       configured: true,
       has_key: !!api_key,
       has_embeddings_key: !!embeddings_api_key,
+      compatible_provider_enabled: compatibleProviderEnabled,
       ...safe,
     })
   } catch (err) {
@@ -84,6 +92,12 @@ export async function POST(request: Request) {
     const provider = body.provider as AiProvider
     if (provider !== 'openai' && provider !== 'anthropic' && provider !== 'openai_compatible') {
       return bad(t('ai.providerInvalid'))
+    }
+    if (!isProviderAllowed(provider)) {
+      return NextResponse.json(
+        { error: t('ai.compatibleProviderDisabled'), code: COMPATIBLE_PROVIDER_DISABLED_CODE },
+        { status: 403 },
+      )
     }
     const model = typeof body.model === 'string' ? body.model.trim() : ''
     if (!model) return bad(t('ai.modelRequired'))

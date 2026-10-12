@@ -5,6 +5,7 @@ import { decrypt } from '@/lib/whatsapp/encryption'
 import { validateAiCredentials } from '@/lib/ai/validate'
 import { AiError, type AiProvider } from '@/lib/ai/types'
 import { normalizeOpenAiCompatibleBaseUrl } from '@/lib/ai/providers/openai-compatible'
+import { isProviderAllowed, COMPATIBLE_PROVIDER_DISABLED_CODE } from '@/lib/ai/compatible-provider-gate'
 import { getT } from '@/lib/i18n/translate'
 
 const t = getT('Api')
@@ -35,6 +36,12 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: t('ai.providerInvalid') },
         { status: 400 },
+      )
+    }
+    if (!isProviderAllowed(provider)) {
+      return NextResponse.json(
+        { error: t('ai.compatibleProviderDisabled'), code: COMPATIBLE_PROVIDER_DISABLED_CODE },
+        { status: 403 },
       )
     }
     const model = typeof body.model === 'string' ? body.model.trim() : ''

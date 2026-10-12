@@ -1972,6 +1972,7 @@
       "removeSuccess": "AI 설정이 제거되었습니다.",
       "removeFailed": "제거하지 못했습니다.",
       "providerOpenAiCompatible": "OpenAI 호환 API",
+      "compatibleProviderDisabledNotice": "이 배포에서는 OpenAI 호환 제공자가 비활성화되어 있습니다. OpenAI 또는 Anthropic을 선택하세요.",
       "baseUrl": "기본 URL",
       "baseUrlHint": "OpenAI 호환 API의 기본 URL입니다. 예: https://api.groq.com/openai/v1. /chat/completions 경로는 직접 입력하지 않는 경우 자동으로 추가됩니다.",
       "missingBaseUrl": "OpenAI 호환 API의 기본 URL을 입력하세요."
@@ -2581,6 +2582,7 @@
       "updateConversationFailed": "대화를 업데이트하지 못했습니다",
       "loadConfigFailed": "AI 설정을 불러오지 못했습니다",
       "providerInvalid": "제공자는 \"openai\", \"anthropic\" 또는 \"openai_compatible\"이어야 합니다",
+      "compatibleProviderDisabled": "이 배포에서는 이 제공자가 비활성화되어 있습니다.",
       "baseUrlRequired": "openai_compatible에는 base_url이 필수입니다",
       "baseUrlInvalid": "base_url은 올바른 http(s) URL이어야 합니다",
       "modelRequired": "모델은 필수입니다",

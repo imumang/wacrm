@@ -1972,6 +1972,7 @@
       "removeSuccess": "Configuración de IA eliminada.",
       "removeFailed": "Error al eliminar.",
       "providerOpenAiCompatible": "API compatible con OpenAI",
+      "compatibleProviderDisabledNotice": "El proveedor compatible con OpenAI está deshabilitado en esta instalación. Elige OpenAI o Anthropic.",
       "baseUrl": "URL base",
       "baseUrlHint": "URL base de la API compatible con OpenAI, por ejemplo https://api.groq.com/openai/v1. /chat/completions se añade automáticamente, salvo que incluyas esa ruta.",
       "missingBaseUrl": "Introduce la URL base de la API compatible con OpenAI."
@@ -2581,6 +2582,7 @@
       "updateConversationFailed": "Error al actualizar la conversación",
       "loadConfigFailed": "Error al cargar la configuración de IA",
       "providerInvalid": "El proveedor debe ser \"openai\", \"anthropic\" o \"openai_compatible\"",
+      "compatibleProviderDisabled": "Este proveedor está deshabilitado en esta instalación.",
       "baseUrlRequired": "base_url es obligatorio para openai_compatible",
       "baseUrlInvalid": "base_url debe ser una URL http(s) válida",
       "modelRequired": "El modelo es obligatorio",

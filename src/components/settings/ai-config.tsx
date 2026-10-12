@@ -60,6 +60,8 @@ export function AiConfig() {
   const [removing, setRemoving] = useState(false);
 
   const [configured, setConfigured] = useState(false);
+  // Server-decided gate; the API enforces it regardless of what the UI shows.
+  const [compatibleEnabled, setCompatibleEnabled] = useState(false);
   const [provider, setProvider] = useState<AiProvider>('openai');
   const [model, setModel] = useState(AI_PROVIDER_DEFAULT_MODEL.openai);
   const [baseUrl, setBaseUrl] = useState('');
@@ -93,6 +95,7 @@ export function AiConfig() {
         toast.error(data.error ?? t('loadFailed'));
         return;
       }
+      setCompatibleEnabled(data.compatible_provider_enabled === true);
       if (data.configured) {
         setConfigured(true);
         setProvider(data.provider);
@@ -292,9 +295,14 @@ export function AiConfig() {
                     <SelectItem value="anthropic">
                       {PROVIDER_LABEL.anthropic}
                     </SelectItem>
-                    <SelectItem value="openai_compatible">
-                      {t('providerOpenAiCompatible')}
-                    </SelectItem>
+                    {(compatibleEnabled || provider === 'openai_compatible') && (
+                      <SelectItem
+                        value="openai_compatible"
+                        disabled={!compatibleEnabled}
+                      >
+                        {t('providerOpenAiCompatible')}
+                      </SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -309,6 +317,12 @@ export function AiConfig() {
                   disabled={disabled}
                 />
               </div>
+
+              {provider === 'openai_compatible' && !compatibleEnabled && (
+                <p className="text-xs text-destructive sm:col-span-2">
+                  {t('compatibleProviderDisabledNotice')}
+                </p>
+              )}
 
               {provider === 'openai_compatible' && (
                 <div className="space-y-2">
