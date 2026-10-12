@@ -63,6 +63,16 @@ jobs:
       - name: Replay every migration from scratch
         run: supabase db reset --local --no-seed
 
+      # The pinned CLI's reset leaves anon/authenticated/service_role with no
+      # table privileges, so the behavioural verifiers below cannot impersonate
+      # `authenticated`. Restore the standard API-role privileges on this
+      # throwaway database only (remove this step when the CLI pin above moves to
+      # >= 2.119.0, whose default privileges already include them); see the
+      # header of the file for the full
+      # reasoning. RLS still decides row visibility.
+      - name: Apply standard API-role table privileges (CI database only)
+        run: supabase db query --local --file supabase/ci/ci-table-privileges.sql
+
       # A migration can apply "successfully" and still do nothing —
       # every DDL statement here is IF NOT EXISTS-guarded, which turns a
       # typo'd object name into a silent no-op. Assert the outcome, not

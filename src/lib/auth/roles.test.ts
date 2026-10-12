@@ -3,6 +3,8 @@ import {
   ACCOUNT_ROLES,
   type AccountRole,
   canDeleteAccount,
+  canGenerateVectorMemory,
+  canImportHistoricalData,
   canEditSettings,
   canManageMembers,
   canSendMessages,
@@ -127,4 +129,38 @@ describe("capability predicates", () => {
     expect(canTransferOwnership("agent")).toBe(false);
     expect(canTransferOwnership("viewer")).toBe(false);
   });
+});
+
+describe("learning-operation gates (PATCH-008)", () => {
+  const helpers = {
+    canImportHistoricalData,
+    canGenerateVectorMemory,
+  } as const;
+
+  // role -> expected result. Admin+ only; everything else fails closed.
+  const matrix: ReadonlyArray<[unknown, boolean]> = [
+    ["owner", true],
+    ["admin", true],
+    ["agent", false],
+    ["viewer", false],
+    [null, false],
+    [undefined, false],
+    ["", false],
+    ["superadmin", false],
+    ["ADMIN", false],
+  ];
+
+  for (const [name, helper] of Object.entries(helpers)) {
+    describe(name, () => {
+      it.each(matrix)("role %j -> %s", (role, expected) => {
+        expect(helper(role as AccountRole)).toBe(expected);
+      });
+
+      it("agrees with hasMinRole(role, 'admin') for every valid role", () => {
+        for (const role of ACCOUNT_ROLES) {
+          expect(helper(role)).toBe(hasMinRole(role, "admin"));
+        }
+      });
+    });
+  }
 });

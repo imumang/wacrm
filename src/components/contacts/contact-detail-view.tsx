@@ -42,6 +42,7 @@ import {
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { contactHandle } from '@/lib/whatsapp/wa-identity';
+import { parseInternationalPhone } from '@/lib/whatsapp/phone-utils';
 
 interface ContactDetailViewProps {
   open: boolean;
@@ -204,6 +205,16 @@ export function ContactDetailView({
       return;
     }
 
+    // Same rule as the create form: a changed number must start with `+`
+    // and a country code (issue #586). Unchanged numbers — including the
+    // digits-only form the inbound webhook stores — are left alone so a
+    // name/email edit is never blocked by the phone field.
+    const phoneChanged = editPhone.trim() !== (contact?.phone ?? '');
+    if (phoneChanged && !parseInternationalPhone(editPhone)) {
+      toast.error(t('toastPhoneNeedsCountryCode'));
+      return;
+    }
+
     setSavingDetails(true);
     const { error } = await supabase
       .from('contacts')
@@ -360,8 +371,8 @@ export function ContactDetailView({
 
       toast.success(t('toastTemplateSent', { name: template.name }));
     } catch (err) {
-      const reason = err instanceof Error ? err.message : 'network error';
-      toast.error(`Failed to send template: ${reason}`);
+      const reason = err instanceof Error ? err.message : t('networkError');
+      toast.error(t('toastTemplateFailed', { reason }));
     } finally {
       setSendingTemplate(false);
     }

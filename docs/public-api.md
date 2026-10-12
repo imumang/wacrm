@@ -103,7 +103,7 @@ and to discover its scopes.
 
 ```bash
 curl https://your-crm.example.com/api/v1/me \
-  -H "Authorization: Bearer wacrm_live_xxx"
+  -H "Authorization: Bearer $WACRM_API_KEY"
 ```
 
 ```json
@@ -121,9 +121,16 @@ Send a WhatsApp message to a phone number. Scope: `messages:send`. You
 pass an **E.164 number**, not an internal id — the endpoint
 finds-or-creates the contact + conversation, then sends.
 
+`to` must start with `+` followed by the country code (`+14155550123`;
+spaces, dashes and parentheses between the digits are fine). A number
+without the `+` is rejected with `400 bad_request` even when it happens
+to be the right digits: the API can't tell `14155550123` (US, with
+country code) from `4155551212` (a US national number that Meta would
+deliver to +41, Switzerland), so it doesn't guess.
+
 ```bash
 curl -X POST https://your-crm.example.com/api/v1/messages \
-  -H "Authorization: Bearer wacrm_live_xxx" \
+  -H "Authorization: Bearer $WACRM_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{ "to": "+14155550123", "type": "text", "text": "Hi 👋" }'
 ```
@@ -186,9 +193,10 @@ or phone) and `?tag=<tagId>`.
 
 ### `POST /api/v1/contacts`
 
-Create a contact. Scope: `contacts:write`. `phone` (E.164) is required;
-`name`, `email`, `company`, and `tags` (an array of tag names, created
-if missing) are optional. **Find-or-create by phone:** an existing
+Create a contact. Scope: `contacts:write`. `phone` (E.164, leading `+`
+and country code required — same rule as `POST /api/v1/messages`) is
+required; `name`, `email`, `company`, and `tags` (an array of tag names,
+created if missing) are optional. **Find-or-create by phone:** an existing
 match returns `200` with the existing contact; a new contact returns
 `201`. The response body is the serialized contact (same shape as the
 list rows above).
@@ -228,7 +236,7 @@ returns fast — poll `GET /api/v1/broadcasts/{id}` for progress.
 
 ```bash
 curl -X POST https://your-crm.example.com/api/v1/broadcasts \
-  -H "Authorization: Bearer wacrm_live_xxx" \
+  -H "Authorization: Bearer $WACRM_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
         "name": "July promo",
@@ -242,8 +250,9 @@ curl -X POST https://your-crm.example.com/api/v1/broadcasts \
 ```
 
 Recipients are capped at **1000 per request** — split larger sends.
-Invalid phone numbers are dropped and counted as `rejected`. Response
-(202):
+Invalid phone numbers — including any without a leading `+` and country
+code — are dropped and counted as `rejected`; if none are valid the
+request fails with `400 bad_request`. Response (202):
 
 ```json
 {
@@ -307,7 +316,7 @@ All under scope `webhooks:manage`.
 
 ```bash
 curl -X POST https://your-crm.example.com/api/v1/webhooks \
-  -H "Authorization: Bearer wacrm_live_xxx" \
+  -H "Authorization: Bearer $WACRM_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{ "url": "https://example.com/hooks/wacrm", "events": ["message.received"] }'
 # → 201 { "data": { "id": "…", "url": "…", "events": [...], "secret": "whsec_…" } }

@@ -165,6 +165,9 @@ Key pages:
   App or several; how `META_APP_SECRET` takes a comma-separated list
 - [Fork customization and upstream-upgrade registry](./docs/customization-registry.md)
   — baseline, registry location, upgrade policy, and documentation rule
+- [Auth emails](./docs/auth-emails.md) — what Supabase must allow so
+  confirmation and password-reset links come back to *your* domain
+  instead of `localhost:3000`, and how `/auth/callback` handles them
 
 ## Stack
 

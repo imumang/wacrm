@@ -1,6 +1,9 @@
 import { AiError, type AiUsage } from './types'
 import { aiRequestTimeoutMs } from './defaults'
 import { providerHttpError, toNetworkError } from './providers/shared'
+import { getT } from '@/lib/i18n/translate'
+
+const t = getT('LibErrors')
 
 // ============================================================
 // Embeddings (OpenAI-compatible).
@@ -131,7 +134,7 @@ export async function embedTextsWithUsage(
     const data = (await res.json().catch(() => null)) as EmbeddingResponse | null
     const rows = data?.data
     if (!rows || rows.length !== batch.length) {
-      throw new AiError('Embeddings response was malformed.', {
+      throw new AiError(t('ai.embeddingsMalformed'), {
         code: 'embeddings_malformed',
       })
     }
@@ -141,14 +144,14 @@ export async function embedTextsWithUsage(
     // a missing one to 0 would silently misalign chunks with their
     // vectors (chunk N gets chunk M's embedding), so fail loud instead.
     if (rows.some((r) => typeof r.index !== 'number')) {
-      throw new AiError('Embeddings response was missing result indices.', {
+      throw new AiError(t('ai.embeddingsMissingIndices'), {
         code: 'embeddings_malformed',
       })
     }
     const ordered = [...rows].sort((a, b) => a.index! - b.index!)
     for (const r of ordered) {
       if (!Array.isArray(r.embedding)) {
-        throw new AiError('Embeddings response missing a vector.', {
+        throw new AiError(t('ai.embeddingsMissingVector'), {
           code: 'embeddings_malformed',
         })
       }
