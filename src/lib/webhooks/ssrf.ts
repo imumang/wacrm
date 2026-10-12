@@ -121,53 +121,40 @@ function parseIPv6(ip: string): number[] | null {
   return [...head.flat(), ...new Array(fill * 2).fill(0), ...tail.flat()];
 }
 
-/** True for any IPv6 address outside global unicast. */
+/**
+ * True for any IPv6 address that is not demonstrably public global
+ * unicast. Allowlist, fail closed: only 2000::/3 is considered, then
+ * special-purpose carve-outs are removed. Everything else (site-local
+ * fec0::/10, ULA, link-local, multicast, NAT64 64:ff9b::/32, SRv6
+ * 5f00::/16, unassigned space, ::/128, ::1, ...) is rejected by virtue
+ * of not being in 2000::/3.
+ */
 function isReservedIPv6(b: number[]): boolean {
   const zerosThrough = (n: number) => b.slice(0, n).every((x) => x === 0);
-
-  // ::/128 unspecified and ::1/128 loopback.
-  if (zerosThrough(15) && b[15] <= 1) return true;
 
   // IPv4-mapped ::ffff:0:0/96 — classify the address it actually names.
   if (zerosThrough(10) && b[10] === 0xff && b[11] === 0xff) {
     return isReservedIPv4(b.slice(12));
   }
 
-  // The rest of ::/96 is IPv4-compatible (deprecated) plus reserved
-  // space; nothing in it is a routable webhook target.
-  if (zerosThrough(12)) return true;
+  // Global unicast is 2000::/3 (first three bits 001); all else is rejected.
+  if ((b[0] & 0xe0) !== 0x20) return true;
 
-  // NAT64 64:ff9b::/32 — covers the well-known /96 prefix and the
-  // local-use 64:ff9b:1::/48. RFC 6052 allows the embedded IPv4 at
-  // several offsets, so block the whole prefix rather than guessing
-  // which one is in play.
-  if (b[0] === 0x00 && b[1] === 0x64 && b[2] === 0xff && b[3] === 0x9b) {
+  // 2001::/23 IETF protocol assignments — includes Teredo 2001::/32,
+  // benchmarking 2001:2::/48, ORCHID and other non-routed assignments.
+  if (b[0] === 0x20 && b[1] === 0x01 && b[2] <= 0x01) {
     return true;
   }
+  // 2001:db8::/32 documentation.
+  if (b[0] === 0x20 && b[1] === 0x01 && b[2] === 0x0d && b[3] === 0xb8) return true;
+  // 3fff::/20 documentation (RFC 9637).
+  if (b[0] === 0x3f && b[1] === 0xff && (b[2] & 0xf0) === 0x00) return true;
 
   // 6to4 2002::/16 — the embedded IPv4 is bits 16..47, and that is the
   // address the packet ends up at.
   if (b[0] === 0x20 && b[1] === 0x02) {
     return isReservedIPv4(b.slice(2, 6));
   }
-
-  if (b[0] === 0x20 && b[1] === 0x01) {
-    // Teredo 2001::/32 always embeds a client IPv4 (bit-inverted) and
-    // is deprecated; block the prefix outright.
-    if (b[2] === 0x00 && b[3] === 0x00) return true;
-    // ORCHID 2001:10::/28 and 2001:20::/28 — non-routed identifiers.
-    if (b[2] === 0x00 && ((b[3] & 0xf0) === 0x10 || (b[3] & 0xf0) === 0x20)) {
-      return true;
-    }
-    // 2001:db8::/32 documentation.
-    if (b[2] === 0x0d && b[3] === 0xb8) return true;
-  }
-
-  if (b[0] === 0xfe && (b[1] & 0xc0) === 0x80) return true; // fe80::/10 link-local
-  if ((b[0] & 0xfe) === 0xfc) return true; // fc00::/7 ULA
-  if (b[0] === 0xff) return true; // ff00::/8 multicast
-  // 100::/64 discard-only.
-  if (b[0] === 0x01 && b.slice(1, 8).every((x) => x === 0)) return true;
 
   return false;
 }
